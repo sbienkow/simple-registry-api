@@ -1,16 +1,28 @@
-import pathlib
-from setuptools import setup
+import os
+import sys
+from setuptools import setup  # type: ignore
 
 # The directory containing this file
-HERE = pathlib.Path(__file__).parent
+HERE = os.path.dirname(__file__)
 
 # The text of the README file
-README = (HERE / 'README.md').read_text()
+README_FILE = (os.path.join(HERE, 'README.md'))
+with open(README_FILE) as f:
+    README = f.read()
+
+requirements = [  # type: ignore
+    'requests>=2.4.3, <3.0.0',
+    'ecdsa>=0.13.0, <0.14.0',
+    'jws>=0.1.3, <0.2.0',
+]
+
+if sys.version_info < (3, 5):
+    requirements.append('typing')
 
 # This call to setup() does all the work
 setup(
     name='simple-registry-api',
-    version='1.0.0',
+    version='0.1.0',
     description='Simple docker registry API',
     keywords='docker docker-registry docker-image REST',
     long_description=README,
@@ -28,7 +40,5 @@ setup(
     ],
     packages=['simple_registry_api'],
     include_package_data=True,
-    install_requires=[
-        'docker-registry-client >= 0.5.2'
-    ]
+    install_requires=requirements
 )

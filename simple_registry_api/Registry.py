@@ -1,9 +1,24 @@
+"""
+    Copyright 2019 sbienkow
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+"""
 from typing import Dict, Union, Iterable, Set
 from types import MappingProxyType  # Readonly dict
 
-# docker_registry_client doesn't provide typing
+# BaseClient doesn't provide typing
 # so we need to ignore it
-from docker_registry_client import BaseClient  # type: ignore
+from ._BaseClient import BaseClientV2 as BaseClient
 
 
 class Base:
@@ -48,6 +63,16 @@ class Manifest(Base):
     def delete(self) -> None:
         self._client.delete_manifest(self._repo, self._digest)
 
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return (self.digest == other.digest
+                and self.repository == other.repository
+                and self.content == other.content)
+
+    def __hash__(self):
+        return hash(repr(self))
+
 
 class Tag(Base):
     def __init__(self, client: BaseClient, repo: str, tag: str):
@@ -80,7 +105,10 @@ class Tag(Base):
         self.manifest.delete()
 
     def __eq__(self, other) -> bool:
-        return self._tag == other._tag and self._repo == other._repo
+        if not isinstance(other, type(self)):
+            return NotImplemented
+        return (self.tag == other.tag
+                and self.repository == other.repository)
 
 
 class Repository(Base):

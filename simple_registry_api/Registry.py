@@ -15,6 +15,7 @@
 """
 from typing import Dict, Union, Iterable, Set
 from types import MappingProxyType  # Readonly dict
+from datetime import datetime
 
 # BaseClient doesn't provide typing
 # so we need to ignore it
@@ -22,7 +23,7 @@ from ._BaseClient import BaseClientV2 as BaseClient
 
 
 class Base:
-    def __init__(self, name: str):
+    def __init__(self, name: str) -> None:
         self.__name: str = name
 
     @property
@@ -38,12 +39,13 @@ class Manifest(Base):
                  client: BaseClient,
                  repo: str,
                  digest: str,
-                 content: Union[Dict, None] = None):
+                 content: Union[Dict, None] = None) -> None:
         super().__init__('{}:{}'.format(repo, digest))
         self._client: BaseClient = client
         self._repo: str = repo
         self._digest: str = digest
         self._content: Union[Dict, None] = content
+        self._age: Union[datetime, None] = None
 
     @property
     def repository(self) -> str:
@@ -53,15 +55,24 @@ class Manifest(Base):
     def content(self) -> MappingProxyType:
         if self._content is None:
             self._content, _ = self._client.get_manifest_and_digest(
-                self._repo, self._digest)
+                self.repository, self.digest)
         return MappingProxyType(self._content)
 
     @property
     def digest(self) -> str:
         return self._digest
 
+    @property
+    def age(self) -> datetime:
+        if self._age is None:
+            conf = self.content['config']
+            blob = self._client.get_blob(self.repository, digest=conf['digest'], schema=conf['mediaType'])
+            age_str = blob['created'].split('.')[0]
+            self._age = datetime.strptime(age_str, '%Y-%m-%dT%H:%M:%S')
+        return self._age
+
     def delete(self) -> None:
-        self._client.delete_manifest(self._repo, self._digest)
+        self._client.delete_manifest(self.repository, self.digest)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, type(self)):
@@ -75,7 +86,7 @@ class Manifest(Base):
 
 
 class Tag(Base):
-    def __init__(self, client: BaseClient, repo: str, tag: str):
+    def __init__(self, client: BaseClient, repo: str, tag: str) -> None:
         super().__init__('{}:{}'.format(repo, tag))
         self._client: BaseClient = client
         self._repo: str = repo
@@ -96,7 +107,7 @@ class Tag(Base):
             manifest, digest = self._client.get_manifest_and_digest(
                 self._repo, self._tag)
             self._manifest = Manifest(self._client,
-                                      self._repo,
+                                      self.repository,
                                       digest,
                                       manifest)
         return self._manifest
@@ -110,9 +121,12 @@ class Tag(Base):
         return (self.tag == other.tag
                 and self.repository == other.repository)
 
+    def __hash__(self):
+        return hash(repr(self))
+
 
 class Repository(Base):
-    def __init__(self, client: BaseClient, repo: str):
+    def __init__(self, client: BaseClient, repo: str) -> None:
         super().__init__(repo)
         self._client: BaseClient = client
         self._repo: str = repo
@@ -155,7 +169,7 @@ class Registry(Base):
                  verify_ssl: bool = False,
                  username: str = None,
                  password: str = None,
-                 api_timeout: int = None):
+                 api_timeout: int = None) -> None:
         super().__init__(host)
         self._client: BaseClient = BaseClient(
             host=host,

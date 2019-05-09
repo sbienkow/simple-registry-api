@@ -160,6 +160,7 @@ class BaseClientV2(CommonBaseClient):
     schema_1_signed = BASE_CONTENT_TYPE + '.v1+prettyjws'
     schema_1 = BASE_CONTENT_TYPE + '.v1+json'
     schema_2 = BASE_CONTENT_TYPE + '.v2+json'
+    schema_blob = 'application/vnd.docker.container.image.v1+json'
 
     def __init__(self, *args, **kwargs):
         auth_service_url = kwargs.pop("auth_service_url", "")
@@ -223,6 +224,15 @@ class BaseClientV2(CommonBaseClient):
         self.auth.desired_scope = 'repository:%s:*' % name
         return self._http_call(self.MANIFEST, delete,
                                name=name, reference=digest)
+
+    def get_blob(self, name, digest, schema=schema_blob):
+        self.auth.desired_scope = 'repository:%s:*' % name
+        response = self._http_response(
+            self.BLOB, get, name=name, digest=digest,
+            schema=schema,
+        )
+        return response.json()
+
 
     def delete_blob(self, name, digest):
         self.auth.desired_scope = 'repository:%s:*' % name

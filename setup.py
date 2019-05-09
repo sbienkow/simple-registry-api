@@ -22,7 +22,7 @@ if sys.version_info < (3, 5):
 # This call to setup() does all the work
 setup(
     name='simple-registry-api',
-    version='0.1.0',
+    version='1.1.0',
     description='Simple docker registry API',
     keywords='docker docker-registry docker-image REST',
     long_description=README,

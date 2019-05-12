@@ -18,16 +18,9 @@ import logging
 import json
 from collections import namedtuple
 
-from requests import get, put, delete
+from requests import Session
 from requests.exceptions import HTTPError
 from .AuthorizationService import AuthorizationService
-from .manifest import sign as sign_manifest
-
-# urllib3 throws some ssl warnings with older versions of python
-#   they're probably ok for the registry client to ignore
-import warnings
-warnings.filterwarnings("ignore")
-
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +30,16 @@ class CommonBaseClient(object):
                  api_timeout=None):
         self.host = host
 
+        self._session = session = Session()
+        self._get = session.get
+        self._put = session.put
+        self._delete = session.delete
+
         self.method_kwargs = {}
         if verify_ssl is not None:
             self.method_kwargs['verify'] = verify_ssl
         if username is not None and password is not None:
-            self.method_kwargs['auth'] = (username, password)
+            session.auth = (username, password)
         if api_timeout is not None:
             self.method_kwargs['timeout'] = api_timeout
 
@@ -57,10 +55,14 @@ class CommonBaseClient(object):
             data = json.dumps(data)
         path = url.format(**kwargs)
         logger.debug("%s %s", method.__name__.upper(), path)
-        response = method(self.host + path,
-                          data=data, headers=header, **self.method_kwargs)
-        logger.debug("%s %s", response.status_code, response.reason)
-        response.raise_for_status()
+        try:
+            response = method(self.host + path,
+                              data=data, headers=header, **self.method_kwargs)
+            logger.debug("%s %s", response.status_code, response.reason)
+            response.raise_for_status()
+        except Exception:
+            self._session.close()
+            raise
 
         return response
 
@@ -77,80 +79,6 @@ class CommonBaseClient(object):
         return response.json()
 
 
-class BaseClientV1(CommonBaseClient):
-    IMAGE_LAYER = '/v1/images/{image_id}/layer'
-    IMAGE_JSON = '/v1/images/{image_id}/json'
-    IMAGE_ANCESTRY = '/v1/images/{image_id}/ancestry'
-    REPO = '/v1/repositories/{namespace}/{repository}'
-    TAGS = REPO + '/tags'
-
-    @property
-    def version(self):
-        return 1
-
-    def search(self, q=''):
-        """GET /v1/search"""
-        if q:
-            q = '?q=' + q
-        return self._http_call('/v1/search' + q, get)
-
-    def check_status(self):
-        """GET /v1/_ping"""
-        return self._http_call('/v1/_ping', get)
-
-    def get_images_layer(self, image_id):
-        """GET /v1/images/{image_id}/layer"""
-        return self._http_call(self.IMAGE_LAYER, get, image_id=image_id)
-
-    def put_images_layer(self, image_id, data):
-        """PUT /v1/images/(image_id)/layer"""
-        return self._http_call(self.IMAGE_LAYER, put,
-                               image_id=image_id, data=data)
-
-    def put_image_layer(self, image_id, data):
-        """PUT /v1/images/(image_id)/json"""
-        return self._http_call(self.IMAGE_JSON, put,
-                               data=data, image_id=image_id)
-
-    def get_image_layer(self, image_id):
-        """GET /v1/images/(image_id)/json"""
-        return self._http_call(self.IMAGE_JSON, get, image_id=image_id)
-
-    def get_image_ancestry(self, image_id):
-        """GET /v1/images/(image_id)/ancestry"""
-        return self._http_call(self.IMAGE_ANCESTRY, get, image_id=image_id)
-
-    def get_repository_tags(self, namespace, repository):
-        """GET /v1/repositories/(namespace)/(repository)/tags"""
-        return self._http_call(self.TAGS, get,
-                               namespace=namespace, repository=repository)
-
-    def get_image_id(self, namespace, respository, tag):
-        """GET /v1/repositories/(namespace)/(repository)/tags/(tag*)"""
-        return self._http_call(self.TAGS + '/' + tag, get,
-                               namespace=namespace, repository=respository)
-
-    def get_tag_json(self, namespace, repository, tag):
-        """GET /v1/repositories(namespace)/(repository)tags(tag*)/json"""
-        return self._http_call(self.TAGS + '/' + tag + '/json', get,
-                               namespace=namespace, repository=repository)
-
-    def delete_repository_tag(self, namespace, repository, tag):
-        """DELETE /v1/repositories/(namespace)/(repository)/tags/(tag*)"""
-        return self._http_call(self.TAGS + '/' + tag, delete,
-                               namespace=namespace, repository=repository)
-
-    def set_tag(self, namespace, repository, tag, image_id):
-        """PUT /v1/repositories/(namespace)/(repository)/tags/(tag*)"""
-        return self._http_call(self.TAGS + '/' + tag, put, data=image_id,
-                               namespace=namespace, repository=repository)
-
-    def delete_repository(self, namespace, repository):
-        """DELETE /v1/repositories/(namespace)/(repository)/"""
-        return self._http_call(self.REPO, delete,
-                               namespace=namespace, repository=repository)
-
-
 class BaseClientV2(CommonBaseClient):
     _Manifest = namedtuple('_Manifest', 'content, type, digest')
     BASE_CONTENT_TYPE = 'application/vnd.docker.distribution.manifest'
@@ -165,7 +93,6 @@ class BaseClientV2(CommonBaseClient):
     def __init__(self, *args, **kwargs):
         auth_service_url = kwargs.pop("auth_service_url", "")
         super(BaseClientV2, self).__init__(*args, **kwargs)
-        self._manifest_digests = {}
         self.auth = AuthorizationService(
             registry=self.host,
             url=auth_service_url,
@@ -180,15 +107,15 @@ class BaseClientV2(CommonBaseClient):
 
     def check_status(self):
         self.auth.desired_scope = 'registry:catalog:*'
-        return self._http_call('/v2/', get)
+        return self._http_call('/v2/', self._get)
 
     def catalog(self):
         self.auth.desired_scope = 'registry:catalog:*'
-        return self._http_call('/v2/_catalog', get)
+        return self._http_call('/v2/_catalog', self._get)
 
     def get_repository_tags(self, name):
         self.auth.desired_scope = 'repository:%s:*' % name
-        return self._http_call(self.LIST_TAGS, get, name=name)
+        return self._http_call(self.LIST_TAGS, self._get, name=name)
 
     def get_manifest_and_digest(self, name, reference):
         m = self.get_manifest(name, reference)
@@ -197,55 +124,32 @@ class BaseClientV2(CommonBaseClient):
     def get_manifest(self, name, reference):
         self.auth.desired_scope = 'repository:%s:*' % name
         response = self._http_response(
-            self.MANIFEST, get, name=name, reference=reference,
+            self.MANIFEST, self._get, name=name, reference=reference,
             schema=self.schema_2,
         )
-        self._cache_manifest_digest(name, reference, response=response)
         return self._Manifest(
             content=response.json(),
             type=response.headers.get('Content-Type', 'application/json'),
-            digest=self._manifest_digests[name, reference],
-        )
-
-    def put_manifest(self, name, reference, manifest):
-        raise NotImplementedError
-        self.auth.desired_scope = 'repository:%s:*' % name
-        content = {}
-        content.update(manifest._content)
-        content.update({'name': name, 'tag': reference})
-
-        return self._http_call(
-            self.MANIFEST, put, data=sign_manifest(content),
-            content_type=self.schema_1_signed, schema=self.schema_1_signed,
-            name=name, reference=reference,
+            digest=response.headers.get('Docker-Content-Digest'),
         )
 
     def delete_manifest(self, name, digest):
         self.auth.desired_scope = 'repository:%s:*' % name
-        return self._http_call(self.MANIFEST, delete,
+        return self._http_call(self.MANIFEST, self._delete,
                                name=name, reference=digest)
 
     def get_blob(self, name, digest, schema=schema_blob):
         self.auth.desired_scope = 'repository:%s:*' % name
         response = self._http_response(
-            self.BLOB, get, name=name, digest=digest,
+            self.BLOB, self._get, name=name, digest=digest,
             schema=schema,
         )
         return response.json()
 
-
     def delete_blob(self, name, digest):
         self.auth.desired_scope = 'repository:%s:*' % name
-        return self._http_call(self.BLOB, delete,
+        return self._http_call(self.BLOB, self._delete,
                                name=name, digest=digest)
-
-    def _cache_manifest_digest(self, name, reference, response=None):
-        if not response:
-            # TODO: create our own digest
-            raise NotImplementedError()
-
-        untrusted_digest = response.headers.get('Docker-Content-Digest')
-        self._manifest_digests[(name, reference)] = untrusted_digest
 
     def _http_response(self, url, method, data=None, content_type=None,
                        schema=None, **kwargs):
@@ -293,10 +197,7 @@ class BaseClientV2(CommonBaseClient):
 def BaseClient(host, verify_ssl=None, api_version=None, username=None,
                password=None, auth_service_url="", api_timeout=None):
     if api_version == 1:
-        return BaseClientV1(
-            host, verify_ssl=verify_ssl, username=username, password=password,
-            api_timeout=api_timeout,
-        )
+        raise NotImplementedError
     elif api_version == 2:
         return BaseClientV2(
             host, verify_ssl=verify_ssl, username=username, password=password,
@@ -313,13 +214,7 @@ def BaseClient(host, verify_ssl=None, api_version=None, username=None,
             v2_client.check_status()
         except HTTPError as e:
             if e.response.status_code == 404:
-                logger.debug("falling back to v1 API")
-                return BaseClientV1(
-                    host, verify_ssl=verify_ssl, username=username,
-                    password=password, api_timeout=api_timeout,
-                )
-
-            raise
+                raise NotImplementedError
         else:
             logger.debug("using v2 API")
             return v2_client

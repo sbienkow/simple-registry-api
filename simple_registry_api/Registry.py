@@ -66,7 +66,10 @@ class Manifest(Base):
     def age(self) -> datetime:
         if self._age is None:
             conf = self.content['config']
-            blob = self._client.get_blob(self.repository, digest=conf['digest'], schema=conf['mediaType'])
+            blob = self._client.get_blob(self.repository,
+                                         digest=conf['digest'],
+                                         schema=conf['mediaType'])
+
             age_str = blob['created'].split('.')[0]
             self._age = datetime.strptime(age_str, '%Y-%m-%dT%H:%M:%S')
         return self._age

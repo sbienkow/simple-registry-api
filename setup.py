@@ -12,8 +12,6 @@ with open(README_FILE) as f:
 
 requirements = [  # type: ignore
     'requests>=2.4.3, <3.0.0',
-    'ecdsa>=0.13.0, <0.14.0',
-    'jws>=0.1.3, <0.2.0',
 ]
 
 if sys.version_info < (3, 5):
@@ -22,7 +20,7 @@ if sys.version_info < (3, 5):
 # This call to setup() does all the work
 setup(
     name='simple-registry-api',
-    version='1.1.0',
+    version='1.1.1',
     description='Simple docker registry API',
     keywords='docker docker-registry docker-image REST',
     long_description=README,
@@ -30,9 +28,9 @@ setup(
     url='https://github.com/sbienkow/simple-registry-api',
     author='sbienkow',
     author_email='sbienkow@gmail.com',
-    license='GNU GPLv3+',
+    license='Apache 2.0',
     classifiers=[
-        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+        'License :: OSI Approved :: Apache Software License',
         'Development Status :: 2 - Pre-Alpha',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',

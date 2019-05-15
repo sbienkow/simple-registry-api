@@ -13,7 +13,7 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 """
-from typing import Dict, Union, Iterable, Set
+from typing import Dict, Union, Iterable, Set, Any
 from types import MappingProxyType  # Readonly dict
 from datetime import datetime
 
@@ -147,6 +147,12 @@ class Repository(Base):
     def __getitem__(self, tag) -> Tag:
         return self._tags[tag]
 
+    def get(self, tag: str, default: Any) -> Tag:
+        try:
+            return self[tag]
+        except KeyError:
+            return default
+
     @property
     def tags(self) -> Iterable[Tag]:
         return self._tags.values()
@@ -195,6 +201,12 @@ class Registry(Base):
 
     def __getitem__(self, repository: str) -> Repository:
         return self._repositories[repository]
+
+    def get(self, repository: str, default: Any) -> Repository:
+        try:
+            return self[repository]
+        except KeyError:
+            return default
 
     @property
     def repositories(self) -> Iterable[Repository]:

@@ -1,5 +1,4 @@
 import os
-import sys
 from setuptools import setup  # type: ignore
 
 # The directory containing this file
@@ -10,17 +9,10 @@ README_FILE = (os.path.join(HERE, 'README.md'))
 with open(README_FILE) as f:
     README = f.read()
 
-requirements = [  # type: ignore
-    'requests>=2.4.3, <3.0.0',
-]
-
-if sys.version_info < (3, 5):
-    requirements.append('typing')
-
 # This call to setup() does all the work
 setup(
     name='simple-registry-api',
-    version='1.1.2',
+    version='1.1.3',
     description='Simple docker registry API',
     keywords='docker docker-registry docker-image REST',
     long_description=README,
@@ -38,5 +30,8 @@ setup(
     ],
     packages=['simple_registry_api'],
     include_package_data=True,
-    install_requires=requirements
+    install_requires=[
+        'requests>=2.4.3, <3.0.0',
+    ],
+    python_requires='>=3.6.0',
 )

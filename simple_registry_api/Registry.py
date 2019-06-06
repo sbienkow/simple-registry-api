@@ -45,7 +45,7 @@ class Manifest(Base):
         self._repo: str = repo
         self._digest: str = digest
         self._content: Union[Dict, None] = content
-        self._age: Union[datetime, None] = None
+        self._creation_date: Union[datetime, None] = None
 
     @property
     def repository(self) -> str:
@@ -63,16 +63,17 @@ class Manifest(Base):
         return self._digest
 
     @property
-    def age(self) -> datetime:
-        if self._age is None:
+    def creation_date(self) -> datetime:
+        if self._creation_date is None:
             conf = self.content['config']
             blob = self._client.get_blob(self.repository,
                                          digest=conf['digest'],
                                          schema=conf['mediaType'])
 
-            age_str = blob['created'].split('.')[0]
-            self._age = datetime.strptime(age_str, '%Y-%m-%dT%H:%M:%S')
-        return self._age
+            date_str = blob['created'].split('.')[0]
+            self._creation_date = datetime.strptime(date_str,
+                                                    '%Y-%m-%dT%H:%M:%S')
+        return self._creation_date
 
     def delete(self) -> None:
         self._client.delete_manifest(self.repository, self.digest)

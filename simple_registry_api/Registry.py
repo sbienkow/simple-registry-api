@@ -141,7 +141,7 @@ class Repository(Base):
         if self.__tags is None:
             self.__tags = {
                 tag: Tag(self._client, self._repo, tag)
-                for tag in self._client.get_repository_tags(self._repo)['tags']
+                for tag in self._client.get_repository_tags(self._repo)['tags'] or []
             }
         return self.__tags
 

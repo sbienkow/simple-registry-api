@@ -1,1 +1,1 @@
-from .Registry import Registry, Repository, Tag, Manifest
+from .Registry import Manifest, Registry, Repository, Tag

@@ -12,7 +12,7 @@ with open(README_FILE) as f:
 # This call to setup() does all the work
 setup(
     name='simple-registry-api',
-    version='1.1.5',
+    version='1.2.0',
     description='Simple docker registry API',
     keywords='docker docker-registry docker-image REST',
     long_description=README,

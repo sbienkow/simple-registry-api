@@ -13,9 +13,9 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 """
-from typing import Dict, Union, Iterable, Set, Any, Optional
-from types import MappingProxyType  # Readonly dict
 from datetime import datetime
+from types import MappingProxyType  # Readonly dict
+from typing import Any, Dict, Iterable, Optional, Set, Union
 
 # BaseClient doesn't provide typing
 # so we need to ignore it
@@ -31,16 +31,18 @@ class Base:
         return self.__name
 
     def __repr__(self) -> str:
-        return '{}({})'.format(type(self).__name__, self.name)
+        return "{}({})".format(type(self).__name__, self.name)
 
 
 class Manifest(Base):
-    def __init__(self,
-                 client: BaseClient,
-                 repo: str,
-                 digest: str,
-                 content: Union[Dict, None] = None) -> None:
-        super().__init__('{}:{}'.format(repo, digest))
+    def __init__(
+        self,
+        client: BaseClient,
+        repo: str,
+        digest: str,
+        content: Union[Dict, None] = None,
+    ) -> None:
+        super().__init__("{}:{}".format(repo, digest))
         self._client: BaseClient = client
         self._repo: str = repo
         self._digest: str = digest
@@ -55,7 +57,8 @@ class Manifest(Base):
     def content(self) -> MappingProxyType:
         if self._content is None:
             self._content, _ = self._client.get_manifest_and_digest(
-                self.repository, self.digest)
+                self.repository, self.digest
+            )
         return MappingProxyType(self._content)
 
     @property
@@ -65,34 +68,32 @@ class Manifest(Base):
     @property
     def creation_date(self) -> datetime:
         if self._creation_date is None:
-            conf = self.content['config']
-            blob = self._client.get_blob(self.repository,
-                                         digest=conf['digest'],
-                                         schema=conf['mediaType'])
+            conf = self.content["config"]
+            blob = self._client.get_blob(
+                self.repository, digest=conf["digest"], schema=conf["mediaType"]
+            )
 
-            date_str = blob['created'].split('.')[0]
-            self._creation_date = datetime.strptime(date_str,
-                                                    '%Y-%m-%dT%H:%M:%S')
+            date_str = blob["created"].split(".")[0]
+            self._creation_date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S")
         return self._creation_date
 
     def delete(self) -> None:
         self._client.delete_manifest(self.repository, self.digest)
 
-    def tag(self, tag_name) -> 'Tag':
+    def tag(self, tag_name) -> "Tag":
         self._client.put_manifest(self.repository, tag_name, dict(self.content))
-        tag = Tag(
-            self._client,
-            self.repository,
-            tag_name)
+        tag = Tag(self._client, self.repository, tag_name)
         tag._manifest = self
         return tag
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, type(self)):
             return NotImplemented
-        return (self.digest == other.digest
-                and self.repository == other.repository
-                and self.content == other.content)
+        return (
+            self.digest == other.digest
+            and self.repository == other.repository
+            and self.content == other.content
+        )
 
     def __hash__(self):
         return hash(repr(self))
@@ -100,7 +101,7 @@ class Manifest(Base):
 
 class Tag(Base):
     def __init__(self, client: BaseClient, repo: str, tag: str) -> None:
-        super().__init__('{}:{}'.format(repo, tag))
+        super().__init__("{}:{}".format(repo, tag))
         self._client: BaseClient = client
         self._repo: str = repo
         self._tag: str = tag
@@ -118,24 +119,21 @@ class Tag(Base):
     def manifest(self) -> Manifest:
         if self._manifest is None:
             manifest, digest = self._client.get_manifest_and_digest(
-                self._repo, self._tag)
-            self._manifest = Manifest(self._client,
-                                      self.repository,
-                                      digest,
-                                      manifest)
+                self._repo, self._tag
+            )
+            self._manifest = Manifest(self._client, self.repository, digest, manifest)
         return self._manifest
 
     def delete(self) -> None:
         self.manifest.delete()
 
-    def copy(self, new_name) -> 'Tag':
+    def copy(self, new_name) -> "Tag":
         return self.manifest.tag(new_name)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, type(self)):
             return NotImplemented
-        return (self.tag == other.tag
-                and self.repository == other.repository)
+        return self.tag == other.tag and self.repository == other.repository
 
     def __hash__(self):
         return hash(repr(self))
@@ -153,7 +151,7 @@ class Repository(Base):
         if self.__tags is None:
             self.__tags = {
                 tag: Tag(self._client, self._repo, tag)
-                for tag in self._client.get_repository_tags(self._repo)['tags'] or []
+                for tag in self._client.get_repository_tags(self._repo)["tags"] or []
             }
         return self.__tags
 
@@ -186,12 +184,14 @@ class Repository(Base):
 
 
 class Registry(Base):
-    def __init__(self,
-                 host: str,
-                 verify_ssl: bool = False,
-                 username: str = None,
-                 password: str = None,
-                 api_timeout: int = None) -> None:
+    def __init__(
+        self,
+        host: str,
+        verify_ssl: bool = False,
+        username: str = None,
+        password: str = None,
+        api_timeout: int = None,
+    ) -> None:
         super().__init__(host)
         self._client: BaseClient = BaseClient(
             host=host,
@@ -208,7 +208,7 @@ class Registry(Base):
         if self.__repositories is None:
             self.__repositories = {
                 repo: Repository(self._client, repo)
-                for repo in self._client.catalog()['repositories']
+                for repo in self._client.catalog()["repositories"]
             }
         return self.__repositories
 

@@ -78,6 +78,15 @@ class Manifest(Base):
     def delete(self) -> None:
         self._client.delete_manifest(self.repository, self.digest)
 
+    def tag(self, tag_name) -> 'Tag':
+        self._client.put_manifest(self.repository, tag_name, dict(self.content))
+        tag = Tag(
+            self._client,
+            self.repository,
+            tag_name)
+        tag._manifest = self
+        return tag
+
     def __eq__(self, other) -> bool:
         if not isinstance(other, type(self)):
             return NotImplemented
@@ -118,6 +127,9 @@ class Tag(Base):
 
     def delete(self) -> None:
         self.manifest.delete()
+
+    def copy(self, new_name) -> 'Tag':
+        return self.manifest.tag(new_name)
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, type(self)):

@@ -133,6 +133,13 @@ class BaseClientV2(CommonBaseClient):
             digest=response.headers.get('Docker-Content-Digest'),
         )
 
+    def put_manifest(self, name, new_reference, content):
+        self.auth.desired_scope = 'repository:%s:*' % name
+        self._http_response(
+            self.MANIFEST, self._put, name=name, reference=new_reference,
+            data=json.dumps(content), schema=self.schema_2, content_type=self.schema_2,
+        )
+
     def delete_manifest(self, name, digest):
         self.auth.desired_scope = 'repository:%s:*' % name
         return self._http_call(self.MANIFEST, self._delete,
